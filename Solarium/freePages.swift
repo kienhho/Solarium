@@ -51,7 +51,6 @@ class freePages {
             print("[FreePages] Unused pages already cleared.")
             return false
         }
-
         if pageInUse > base {
             let kr = vm_deallocate(mach_task_self_, base, vm_size_t(pageInUse - base))
             if kr != KERN_SUCCESS {
@@ -100,7 +99,7 @@ class freePages {
     }
     
     func grabFreePages() -> Bool {
-        let MAX_PAGE_CNT: Int = 100_000
+        let MAX_PAGE_CNT: Int = 400_000
         var pageMatched: UInt64 = 0
         var src: vm_address_t = 0
         var dst: vm_address_t = 0
@@ -130,21 +129,23 @@ class freePages {
         }
         let srcPtr = UnsafeRawPointer(bitPattern: UInt(src))!
         let patternLen = Int(MemoryLayout.size(ofValue: pattern) == 16 ? 16 : 16)
-
+        
         for i in 0..<MAX_PAGE_CNT {
             kr = vm_copy(mach_task_self_, src, pageSize, dst + pages(i))
             if kr != KERN_SUCCESS {
                 print("[FreePages] Copying page failed at page \(i): \(String(cString: mach_error_string(kr)))")
                 return false
             }
-            for j in 0..<count {
-                let rangePage = UnsafeRawPointer(bitPattern: UInt(base + pages(j)))!
-                if memcmp(srcPtr, rangePage, patternLen) == 0 {
-                    pageMatched += 1
-                }
-                if pageMatched >= UInt64(count / 5) {
-                    print("[Landa] Allocated \(i) free pages.")
-                    return true
+            if i % 1000 == 0 {
+                for j in 0..<count {
+                    let rangePage = UnsafeRawPointer(bitPattern: UInt(base + pages(j)))!
+                    if memcmp(srcPtr, rangePage, patternLen) == 0 {
+                        pageMatched += 1
+                    }
+                    if pageMatched >= UInt64(count / 5) {
+                        print("[Landa] Allocated \(i.formatted(.number.grouping(.automatic))) free pages.")
+                        return true
+                    }
                 }
             }
         }

