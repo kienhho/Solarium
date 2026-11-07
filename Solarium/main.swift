@@ -17,6 +17,9 @@ guard let es = eSocket(count: 2048) else {
     exit(1)
 }
 
+let kbase = es.getBase()
+print("[Main] Kernel base is at 0x\(String(kbase, radix: 16))")
+
 
 
 
