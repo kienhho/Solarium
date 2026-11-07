@@ -7,11 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		F13E4F3C309FC5B800A71164 /* koffset.swift in Sources */ = {isa = PBXBuildFile; fileRef = F13E4F3B309FC5B800A71164 /* koffset.swift */; };
 		F17906B0309D43D70064B2AD /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = F17906AF309D43D70064B2AD /* main.swift */; };
 		F17906B9309D45FF0064B2AD /* freePages.swift in Sources */ = {isa = PBXBuildFile; fileRef = F17906B8309D45FF0064B2AD /* freePages.swift */; };
 		F17906BD309D46890064B2AD /* common.swift in Sources */ = {isa = PBXBuildFile; fileRef = F17906BC309D46890064B2AD /* common.swift */; };
 		F1847CD1309EC5DD009701B7 /* Atomics in Frameworks */ = {isa = PBXBuildFile; productRef = F1847CD0309EC5DD009701B7 /* Atomics */; };
 		F1847CD3309ECA56009701B7 /* eSocket.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1847CD2309ECA56009701B7 /* eSocket.swift */; };
+		F1A4B6D4309FC3E300459063 /* kstruct.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A4B6D3309FC3E300459063 /* kstruct.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -28,11 +30,13 @@
 
 /* Begin PBXFileReference section */
 		F1223AA1309ED457006C2EED /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
+		F13E4F3B309FC5B800A71164 /* koffset.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = koffset.swift; sourceTree = "<group>"; };
 		F17906AC309D43D70064B2AD /* Solarium */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Solarium; sourceTree = BUILT_PRODUCTS_DIR; };
 		F17906AF309D43D70064B2AD /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		F17906B8309D45FF0064B2AD /* freePages.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = freePages.swift; sourceTree = "<group>"; };
 		F17906BC309D46890064B2AD /* common.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = common.swift; sourceTree = "<group>"; };
 		F1847CD2309ECA56009701B7 /* eSocket.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = eSocket.swift; sourceTree = "<group>"; };
+		F1A4B6D3309FC3E300459063 /* kstruct.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = kstruct.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -71,6 +75,8 @@
 				F17906B8309D45FF0064B2AD /* freePages.swift */,
 				F17906BC309D46890064B2AD /* common.swift */,
 				F1847CD2309ECA56009701B7 /* eSocket.swift */,
+				F1A4B6D3309FC3E300459063 /* kstruct.swift */,
+				F13E4F3B309FC5B800A71164 /* koffset.swift */,
 			);
 			path = Solarium;
 			sourceTree = "<group>";
@@ -139,9 +145,11 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F1A4B6D4309FC3E300459063 /* kstruct.swift in Sources */,
 				F17906B9309D45FF0064B2AD /* freePages.swift in Sources */,
 				F17906B0309D43D70064B2AD /* main.swift in Sources */,
 				F1847CD3309ECA56009701B7 /* eSocket.swift in Sources */,
+				F13E4F3C309FC5B800A71164 /* koffset.swift in Sources */,
 				F17906BD309D46890064B2AD /* common.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

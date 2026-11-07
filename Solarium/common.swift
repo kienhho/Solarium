@@ -52,6 +52,7 @@ func allocatePPLpages() -> Bool {
             return false
         }
     }
+    print("[PPL] Allocated 10000 PPL pages")
     return true
 }
 
