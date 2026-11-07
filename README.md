@@ -1,8 +1,23 @@
 # Solarium
 
-A Work-in-Progress Swift re-implementation of [CVE-2023-41974](https://support.apple.com/en-us/120949)
+A Work-in-Progress Swift re-implementation of [CVE-2023-41974](https://support.apple.com/en-us/120949). Kernel read/write uses ICMPv6 filter, taken from the DarkSword kernel exploit.
 
-## Functional:
+Tested on macOS 13.4.1 (22F82).
+
+## How to use
+* Creare an eSocket object to run the exploit
+```swift
+let es = eSocket(count: )
+```
 * Finding kernel base
+```swift
+let kb: UInt64 = es.getBase()
+```
 * Reading 32 bytes
+```swift
+let out: icmp6_filter = es.get32B(address: )!
+```
 * Writing 32 bytes
+```swift
+es.set32B(address: , bytes: )
+```
