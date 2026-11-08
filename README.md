@@ -7,7 +7,7 @@ Tested on macOS 13.4.1 (22F82).
 ## Read-write Object
 * Creare an eSocket object to run the exploit
 ```swift
-let es = eSocket(count: )
+let es = eSocket(count: )!
 ```
 * Finding kernel base
 ```swift
