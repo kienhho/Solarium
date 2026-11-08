@@ -22,7 +22,7 @@ let out: icmp6_filter = es.get32B(address: )!
 es.set32B(address: , bytes: )
 ```
 
-# Virtual Address Translation
+## Virtual Address Translation
 * Initializing virtual address translation
 ```swift
 let vmsa = Translation(es: es)!
