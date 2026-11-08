@@ -10,6 +10,9 @@ import Foundation
 // For: arm64e-apple-macosx13.4.0
 public enum koffset {
     public static let kernproc: UInt64 = 0xfffffe0007ae3130
-    public static let cpu_tte: UInt64 = 0
-    public static let ptov_base: UInt64 = 0
+    public static let cpu_tte: UInt64 = 0xfffffe00079d2aa8
+    public static let ptov_base: UInt64 = 0xfffffe00079d29d0
+    public static let gPhysBase: UInt64 = 0xfffffe0007a8fde0
+    public static let gVirtBase: UInt64 = 0xfffffe0007a8c0f0
+    public static let real_phys_size: UInt64 = 0xfffffe00079d2a90
 }

