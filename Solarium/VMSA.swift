@@ -48,9 +48,9 @@ class Translation {
                 return false
             }
             let entry = ptovEntry(
-                pa: UInt64(out.icmp6_filt.1 << 32) | UInt64(out.icmp6_filt.0),
-                va: UInt64(out.icmp6_filt.3 << 32) | UInt64(out.icmp6_filt.2),
-                len: UInt64(out.icmp6_filt.5 << 32) | UInt64(out.icmp6_filt.4)
+                pa: UInt64(out.icmp6_filt.1) << 32 | UInt64(out.icmp6_filt.0),
+                va: UInt64(out.icmp6_filt.3) << 32 | UInt64(out.icmp6_filt.2),
+                len: UInt64(out.icmp6_filt.5) << 32 | UInt64(out.icmp6_filt.4)
             )
             ptovTable.append(entry)
         }
